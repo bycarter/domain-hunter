@@ -1,2 +1,2 @@
 # domain-hunter
-Tools looking for domains
+(likely) unorganized domain search tooling
