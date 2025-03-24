@@ -37,7 +37,8 @@ def get_domains():
     
     # Build the query dynamically
     query = """
-        SELECT domain, memorability, pronunciation, visual_appeal, brandability, average_score, error
+        SELECT domain, memorability, pronunciation, visual_appeal, brandability, average_score, 
+               price, price_type, error
         FROM domain_results
         WHERE average_score IS NOT NULL
     """
@@ -57,7 +58,7 @@ def get_domains():
         params.append(f"%{search}%")
     
     # Add sorting
-    if sort_by in ['domain', 'memorability', 'pronunciation', 'visual_appeal', 'brandability', 'average_score']:
+    if sort_by in ['domain', 'memorability', 'pronunciation', 'visual_appeal', 'brandability', 'average_score', 'price']:
         query += f" ORDER BY {sort_by} {'DESC' if sort_dir.lower() == 'desc' else 'ASC'}"
     
     # Execute query
@@ -91,17 +92,34 @@ def get_stats():
             AVG(pronunciation) as avg_pronunciation,
             AVG(visual_appeal) as avg_visual_appeal,
             AVG(brandability) as avg_brandability,
-            AVG(average_score) as avg_score
+            AVG(average_score) as avg_score,
+            AVG(price) as avg_price
         FROM domain_results
         WHERE average_score IS NOT NULL
     """).fetchone()
+    
+    # Get price statistics
+    price_stats = conn.execute("""
+        SELECT 
+            price_type, 
+            COUNT(*) as count,
+            AVG(price) as avg_price,
+            MIN(price) as min_price,
+            MAX(price) as max_price
+        FROM domain_results
+        WHERE price IS NOT NULL
+        GROUP BY price_type
+    """).fetchall()
+    
+    price_data = [dict(row) for row in price_stats]
     
     conn.close()
     
     return jsonify({
         'total': total,
         'tlds': tlds,
-        'averages': dict(avg_scores)
+        'averages': dict(avg_scores),
+        'price_stats': price_data
     })
 
 # Create templates directory and template files
@@ -138,6 +156,8 @@ def create_templates():
             --danger-color: #9b1c1c;
             --warning-color: #92400e;
             --info-color: #1e429f;
+            --success-color: #065f46;
+            --active-row-bg: rgba(108, 117, 125, 0.3);
         }
         
         body {
@@ -263,13 +283,23 @@ def create_templates():
             border-radius: 3px;
         }
         
-        .bg-success { background-color: var(--accent-color) !important; }
+        .bg-success { background-color: var(--success-color) !important; }
         .bg-info { background-color: var(--info-color) !important; }
         .bg-warning { background-color: var(--warning-color) !important; }
         .bg-danger { background-color: var(--danger-color) !important; }
+        .bg-premium { background-color: #6f42c1 !important; }
+        .bg-standard { background-color: #20c997 !important; }
+        .bg-taken { background-color: #6c757d !important; }
         
         .score-badge {
             width: 2.2em;
+            display: inline-block;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .price-badge {
+            min-width: 3.5em;
             display: inline-block;
             text-align: center;
             font-weight: bold;
@@ -310,9 +340,19 @@ def create_templates():
             border-left: 2px solid var(--highlight);
         }
         
+        /* Fix for highlighted rows - ensure text remains visible */
         .table-active {
             border-left: 2px solid var(--accent-color) !important;
-            background-color: rgba(100, 116, 139, 0.1) !important;
+            background-color: var(--active-row-bg) !important;
+            color: var(--text-color) !important;
+        }
+        
+        .table-active td {
+            color: var(--text-color) !important;
+        }
+        
+        .table-active .badge {
+            color: white !important;
         }
         
         /* Simpler card title */
@@ -320,6 +360,31 @@ def create_templates():
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 8px;
             margin-bottom: 12px;
+        }
+        
+        /* Price card */
+        .price-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        .price-title {
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.25rem;
+            font-weight: 600;
+        }
+        
+        .price-content {
+            padding: 0.75rem 1.25rem;
+        }
+        
+        /* No data message */
+        .no-data {
+            padding: 2rem;
+            text-align: center;
+            color: #6c757d;
         }
     </style>
 </head>
@@ -340,6 +405,7 @@ def create_templates():
                         <div id="stats-container">
                             <p class="mb-1">Total domains: <span id="total-domains" class="float-end">-</span></p>
                             <p class="mb-1">Avg score: <span id="avg-score" class="float-end">-</span></p>
+                            <p class="mb-1">Priced domains: <span id="priced-domains" class="float-end">-</span></p>
                         </div>
                     </div>
                 </div>
@@ -378,6 +444,15 @@ def create_templates():
                         </div>
                     </div>
                 </div>
+                
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title">PRICING STATS</h5>
+                        <div id="pricing-container">
+                            <div class="text-center py-2">Loading...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="col-md-9">
@@ -406,11 +481,12 @@ def create_templates():
                                         <th class="sortable" data-sort="visual_appeal">VIS <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="brandability">BRAND <span class="sort-icon"></span></th>
                                         <th class="sortable" data-sort="average_score">AVG <span class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="price">PRICE <span class="sort-icon"></span></th>
                                     </tr>
                                 </thead>
                                 <tbody id="domains-table">
                                     <tr>
-                                        <td colspan="6" class="text-center">Loading data...</td>
+                                        <td colspan="7" class="text-center">Loading data...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -448,6 +524,20 @@ def create_templates():
                                         <div class="card-body p-3">
                                             <h6 class="card-title" style="border-bottom: none; padding-bottom: 0;">BRANDABILITY <span id="detail-brandability" class="float-end score-badge">-</span></h6>
                                             <p class="card-text small mt-2">Potential as a strong brand name</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="price-card mt-3" id="price-details">
+                                <div class="price-title">PRICING</div>
+                                <div class="price-content">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="mb-1">Price: <span id="detail-price" class="float-end">-</span></p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p class="mb-1">Type: <span id="detail-price-type" class="float-end">-</span></p>
                                         </div>
                                     </div>
                                 </div>
@@ -540,7 +630,7 @@ def create_templates():
                     })
                     .catch(error => {
                         console.error('Error fetching domains:', error);
-                        domainsTable.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Error loading data. Please try again.</td></tr>`;
+                        domainsTable.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error loading data. Please try again.</td></tr>`;
                     });
             }
             
@@ -553,7 +643,19 @@ def create_templates():
                             ? parseFloat(data.averages.avg_score).toFixed(1)
                             : '-';
                         
+                        // Count priced domains
+                        let pricedDomains = 0;
+                        if (data.price_stats) {
+                            data.price_stats.forEach(stat => {
+                                if (stat.price_type !== 'Error') {
+                                    pricedDomains += stat.count;
+                                }
+                            });
+                        }
+                        document.getElementById('priced-domains').textContent = pricedDomains;
+                        
                         // Populate TLD filter
+                        tldFilter.innerHTML = '<option value="">All TLDs</option>';
                         data.tlds.forEach(tld => {
                             const option = document.createElement('option');
                             option.value = tld.tld;
@@ -574,6 +676,34 @@ def create_templates():
                             `;
                             tldContainer.appendChild(tldItem);
                         });
+                        
+                        // Render pricing stats
+                        const pricingContainer = document.getElementById('pricing-container');
+                        pricingContainer.innerHTML = '';
+                        
+                        if (data.price_stats && data.price_stats.length > 0) {
+                            data.price_stats.forEach(stat => {
+                                if (stat.price_type && stat.count) {
+                                    const priceItem = document.createElement('div');
+                                    priceItem.className = 'd-flex justify-content-between mb-1';
+                                    const priceLabel = stat.price_type.charAt(0).toUpperCase() + stat.price_type.slice(1);
+                                    priceItem.innerHTML = `
+                                        <span>${priceLabel}</span>
+                                        <span class="badge bg-${stat.price_type.toLowerCase()}">${stat.count}</span>
+                                    `;
+                                    pricingContainer.appendChild(priceItem);
+                                    
+                                    if (stat.avg_price) {
+                                        const avgPriceItem = document.createElement('div');
+                                        avgPriceItem.className = 'small text-muted mb-2';
+                                        avgPriceItem.innerHTML = `Avg: $${parseFloat(stat.avg_price).toFixed(2)}`;
+                                        pricingContainer.appendChild(avgPriceItem);
+                                    }
+                                }
+                            });
+                        } else {
+                            pricingContainer.innerHTML = '<div class="text-center py-2">No pricing data</div>';
+                        }
                     })
                     .catch(error => {
                         console.error('Error fetching stats:', error);
@@ -582,7 +712,7 @@ def create_templates():
             
             function renderTable(data) {
                 if (data.length === 0) {
-                    domainsTable.innerHTML = `<tr><td colspan="6" class="text-center">No domains found matching your criteria.</td></tr>`;
+                    domainsTable.innerHTML = `<tr><td colspan="7" class="text-center">No domains found matching your criteria.</td></tr>`;
                     return;
                 }
                 
@@ -601,8 +731,23 @@ def create_templates():
                         return 'danger';
                     };
                     
+                    const getPriceClass = (priceType) => {
+                        if (!priceType) return 'secondary';
+                        if (priceType === 'Premium') return 'premium';
+                        if (priceType === 'Standard') return 'standard';
+                        if (priceType === 'Taken') return 'taken';
+                        return 'secondary';
+                    };
+                    
                     const formatScore = (score) => {
                         return score ? parseFloat(score).toFixed(1) : '-';
+                    };
+                    
+                    const formatPrice = (price, price_type) => {
+                        if (!price_type) return '-';
+                        if (price_type === 'Taken') return 'Taken';
+                        if (price_type === 'Error') return 'Error';
+                        return price ? `$${parseFloat(price).toFixed(2)}` : '-';
                     };
                     
                     row.innerHTML = `
@@ -612,6 +757,7 @@ def create_templates():
                         <td><span class="badge bg-${getScoreClass(domain.visual_appeal)}">${formatScore(domain.visual_appeal)}</span></td>
                         <td><span class="badge bg-${getScoreClass(domain.brandability)}">${formatScore(domain.brandability)}</span></td>
                         <td><span class="badge bg-${getScoreClass(domain.average_score)}">${formatScore(domain.average_score)}</span></td>
+                        <td><span class="badge bg-${getPriceClass(domain.price_type)}">${formatPrice(domain.price, domain.price_type)}</span></td>
                     `;
                     
                     row.addEventListener('click', () => showDomainDetails(index));
@@ -627,6 +773,14 @@ def create_templates():
                 document.getElementById('detail-pronunciation').textContent = domain.pronunciation ? parseFloat(domain.pronunciation).toFixed(1) : '-';
                 document.getElementById('detail-visual_appeal').textContent = domain.visual_appeal ? parseFloat(domain.visual_appeal).toFixed(1) : '-';
                 document.getElementById('detail-brandability').textContent = domain.brandability ? parseFloat(domain.brandability).toFixed(1) : '-';
+                
+                // Set price details
+                document.getElementById('detail-price').textContent = domain.price ? `$${parseFloat(domain.price).toFixed(2)}` : '-';
+                document.getElementById('detail-price-type').textContent = domain.price_type || '-';
+                
+                // Show/hide price details
+                const priceDetails = document.getElementById('price-details');
+                priceDetails.style.display = domain.price_type ? 'block' : 'none';
                 
                 // Highlight selected row
                 document.querySelectorAll('.domain-item').forEach(row => {
@@ -650,13 +804,13 @@ def create_templates():
             }
             
             function exportCsv() {
-                const headers = ['domain', 'memorability', 'pronunciation', 'visual_appeal', 'brandability', 'average_score'];
+                const headers = ['domain', 'memorability', 'pronunciation', 'visual_appeal', 'brandability', 'average_score', 'price', 'price_type'];
                 const csvContent = [
                     headers.join(','),
                     ...domainsData.map(domain => 
                         headers.map(key => domain[key] !== null ? domain[key] : '').join(',')
                     )
-                ].join('\\n');
+                ].join('\n');
                 
                 downloadFile(csvContent, 'domain-scores.csv', 'text/csv');
             }

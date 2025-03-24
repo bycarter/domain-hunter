@@ -54,6 +54,8 @@ def init_db(db_path=None):
     
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
+    
+    # Create main table if it doesn't exist
     c.execute('''
         CREATE TABLE IF NOT EXISTS domain_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,9 +67,25 @@ def init_db(db_path=None):
             average_score REAL,
             raw_json TEXT,
             error TEXT,
+            price REAL,
+            price_type TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Check if price columns exist, add them if not
+    try:
+        c.execute("SELECT price, price_type FROM domain_results LIMIT 1")
+    except sqlite3.OperationalError:
+        # Columns don't exist, add them
+        try:
+            c.execute("ALTER TABLE domain_results ADD COLUMN price REAL")
+            c.execute("ALTER TABLE domain_results ADD COLUMN price_type TEXT")
+            print("Added price columns to database")
+        except sqlite3.OperationalError as e:
+            # This might happen if another process already added the columns
+            print(f"Note: {e}")
+    
     conn.commit()
     return conn
 
@@ -375,12 +393,40 @@ def debug_domain_comparison(available_df, processed_domains):
             for domain in dupes['domain'].unique()[:5]:
                 print(f"  - {domain} appears {len(dupes[dupes['domain'] == domain])} times")
     
-    # Check for other unusual data in the CSV
-    missing_domains = available_df[available_df['domain'].isna() | (available_df['domain'] == '')]
-    if not missing_domains.empty:
-        print(f"\nWARNING: Found {len(missing_domains)} rows with empty domain names!")
-    
     print("--- End Debug Information ---\n")
+
+##############################
+# Pricing Functions          #
+##############################
+
+async def update_domain_prices(conn, domains=None, batch_size=50):
+    """
+    Update domain prices in the database.
+    
+    This is a placeholder for future implementation of pricing functionality.
+    """
+    # Check if any domains have prices already
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM domain_results WHERE price IS NOT NULL")
+    priced_count = cursor.fetchone()[0]
+    
+    print(f"\nFound {priced_count} domains with pricing information")
+    
+    if domains is None:
+        # Get high-scoring domains that need pricing
+        cursor.execute("""
+            SELECT domain FROM domain_results 
+            WHERE average_score >= 7.0 AND price IS NULL
+            ORDER BY average_score DESC
+        """)
+        domains = [row[0] for row in cursor.fetchall()]
+    
+    if not domains:
+        print("No domains need pricing information.")
+        return
+    
+    print(f"In the future, will fetch pricing for {len(domains)} domains.")
+    # This is where you would implement the pricing API calls
 
 ##############################
 # Main Function              #
@@ -402,20 +448,23 @@ async def main():
     
     # Get available domains from CSV
     try:
-        input_path = os.path.join(get_data_directory(), 'domain_availability.csv')
+        # Try the deduplicated file first
+        input_path = os.path.join(get_data_directory(), 'unique_domains.csv')
+        if not os.path.exists(input_path):
+            # Fall back to the original file if deduplicated doesn't exist
+            input_path = os.path.join(get_data_directory(), 'domain_availability.csv')
+            print("Using original domain file. Consider running the updated check_domains.py to create a deduplicated file.")
+        
         # Load CSV with explicit dtype to prevent conversion issues
         df = pd.read_csv(input_path, dtype={'domain': str, 'status': str})
         
         # Print CSV structure
         print(f"\nCSV columns: {df.columns.tolist()}")
         print(f"CSV status values: {df['status'].unique().tolist()}")
+        print(f"Status counts: {df['status'].value_counts().to_dict()}")
         
-        # Check for whitespace or case issues in status
-        status_counts = {s.strip(): len(df[df['status'] == s]) for s in df['status'].unique()}
-        print(f"Status counts: {status_counts}")
-        
-        # Filter for available domains (more careful check)
-        available_df = df[df['status'].str.lower().str.strip() == 'available']
+        # Filter for available domains
+        available_df = df[df['status'] == 'Available']
         
         total_available = len(available_df)
         if total_available == 0:
@@ -448,8 +497,9 @@ async def main():
     debug_domain_comparison(available_df, processed_domains)
     
     # Filter out domains that are already processed - use normalized domains for comparison
+    # Use unique domains to avoid duplicates in the CSV
     domains_to_score = []
-    for domain in available_df['domain'].unique():
+    for domain in available_df['domain'].drop_duplicates():
         # Skip empty domains
         if not domain or pd.isna(domain):
             continue
@@ -464,6 +514,9 @@ async def main():
     if total_domains == 0:
         print("All available domains have already been scored!")
         show_top_domains(conn)
+        
+        # Check for pricing updates on high-scoring domains
+        await update_domain_prices(conn)
         return
     
     print(f"Found {total_domains} domains that need scoring")
@@ -596,6 +649,11 @@ async def main():
     
     # Show top domains from database
     show_top_domains(conn)
+    
+    # Update prices for newly scored high-quality domains
+    high_scoring_domains = [domain for domain, score in high_scores if score >= 7.0]
+    if high_scoring_domains:
+        await update_domain_prices(conn, high_scoring_domains)
 
 def show_top_domains(conn, limit=10):
     """Display the top scoring domains in a nice table."""

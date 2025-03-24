@@ -59,7 +59,7 @@ async def check(session, short, tld):
     if status == 'Available':
         available_domains.append(domain)
     
-    return {'short_word': short, 'tld': tld, 'domain': domain, 'status': status}
+    return {'short_word': short, 'tld': tld, 'domain': domain, 'status': status, 'unique_id': f"{short}_{tld}"}
 
 async def main():
     total_domains = len(df['three_char_word']) * len(tlds)
@@ -109,14 +109,36 @@ async def main():
     # Close progress bar
     progress_bar.close()
 
+    # Process results to remove duplicates
+    results_df = pd.DataFrame(results)
+    
+    # Add an explicit note about duplicates in the CSV
+    print("\nChecking for domain name duplicates...")
+    domain_counts = results_df['domain'].value_counts()
+    duplicated_domains = domain_counts[domain_counts > 1]
+    if not duplicated_domains.empty:
+        print(f"Found {len(duplicated_domains)} domain names that appear more than once.")
+        print("This is normal when the same domain is checked with different methods.")
+        print("Each row in the CSV represents a unique check, identified by the 'unique_id' column.")
+    
     # Save results
     output_path = os.path.join(data_dir, 'domain_availability.csv')
-    results_df = pd.DataFrame(results)
     results_df.to_csv(output_path, index=False)
+    
+    # Create a deduplicated version for easier processing
+    deduplicated_output_path = os.path.join(data_dir, 'unique_domains.csv')
+    deduplicated_df = results_df.drop_duplicates(subset=['domain'])
+    deduplicated_df.to_csv(deduplicated_output_path, index=False)
+    print(f"Created deduplicated file with {len(deduplicated_df)} unique domains at: {deduplicated_output_path}")
     
     # Show summary
     print(f"\nDomain check complete!")
-    print(f"Found {len(available_domains)} available domains out of {total_domains} checked")
+    available_count = len(results_df[results_df['status'] == 'Available'])
+    print(f"Found {available_count} available domains out of {total_domains} checked")
+    
+    # Calculate unique available domains
+    unique_available = len(results_df[results_df['status'] == 'Available'].drop_duplicates(subset=['domain']))
+    print(f"Of these, {unique_available} are unique domain names")
     
     # Show a sample of available domains
     if available_domains:
