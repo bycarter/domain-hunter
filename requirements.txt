@@ -1,0 +1,6 @@
+pandas
+aiohttp
+asyncio
+openai
+python-dotenv
+nltk
