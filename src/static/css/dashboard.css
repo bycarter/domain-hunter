@@ -1,0 +1,241 @@
+:root {
+    --bg-color: #0d1117;
+    --card-bg: #161b22;
+    --text-color: #c9d1d9;
+    --border-color: #30363d;
+    --highlight: #6b7280;
+    --highlight-light: #8c98a8;
+    --accent-color: #64748b;
+    --danger-color: #9b1c1c;
+    --warning-color: #92400e;
+    --info-color: #1e429f;
+    --success-color: #065f46;
+    --active-row-bg: rgba(108, 117, 125, 0.3);
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Courier New', 'Andale Mono', monospace;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+
+.table {
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+.table th {
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+thead {
+    background-color: var(--card-bg);
+}
+
+tbody tr:hover {
+    background-color: rgba(108, 117, 125, 0.1) !important;
+}
+
+.btn-primary {
+    background-color: var(--highlight);
+    border-color: var(--highlight);
+    border-radius: 3px;
+}
+
+.btn-primary:hover {
+    background-color: var(--highlight-light);
+    border-color: var(--highlight-light);
+}
+
+.btn-outline-secondary {
+    color: var(--text-color);
+    border-color: var(--border-color);
+    border-radius: 3px;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--border-color);
+    color: white;
+}
+
+.form-control, .form-select {
+    background-color: #0d1117;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 3px;
+    font-family: 'Courier New', 'Andale Mono', monospace;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: #0d1117;
+    color: var(--text-color);
+    border-color: var(--highlight);
+    box-shadow: 0 0 0 0.25rem rgba(108, 117, 125, 0.25);
+}
+
+.dropdown-menu {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+}
+
+.dropdown-item {
+    color: var(--text-color);
+}
+
+.dropdown-item:hover {
+    background-color: var(--highlight);
+    color: white;
+}
+
+.domain-item {
+    cursor: pointer;
+}
+
+.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sort-icon {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 0.3em;
+    vertical-align: middle;
+    content: "";
+    border-top: 0.3em solid;
+    border-right: 0.3em solid transparent;
+    border-bottom: 0;
+    border-left: 0.3em solid transparent;
+}
+
+.sort-icon.asc {
+    transform: rotate(180deg);
+}
+
+.badge {
+    font-weight: 500;
+    font-size: 0.8em;
+    border-radius: 3px;
+}
+
+.bg-success { background-color: var(--success-color) !important; }
+.bg-info { background-color: var(--info-color) !important; }
+.bg-warning { background-color: var(--warning-color) !important; }
+.bg-danger { background-color: var(--danger-color) !important; }
+.bg-premium { background-color: #6f42c1 !important; }
+.bg-standard { background-color: #20c997 !important; }
+.bg-taken { background-color: #6c757d !important; }
+
+.score-badge {
+    width: 2.2em;
+    display: inline-block;
+    text-align: center;
+    font-weight: bold;
+}
+
+.price-badge {
+    min-width: 3.5em;
+    display: inline-block;
+    text-align: center;
+    font-weight: bold;
+}
+
+.alert-dark {
+    background-color: #1c2128;
+    border-color: var(--border-color);
+    color: var(--text-color);
+    border-radius: 3px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--highlight);
+}
+
+/* Make table more minimal */
+.table tbody tr {
+    border-left: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.table tbody tr:hover {
+    border-left: 2px solid var(--highlight);
+}
+
+/* Fix for highlighted rows - ensure text remains visible */
+.table-active {
+    border-left: 2px solid var(--accent-color) !important;
+    background-color: var(--active-row-bg) !important;
+    color: var(--text-color) !important;
+}
+
+.table-active td {
+    color: var(--text-color) !important;
+}
+
+.table-active .badge {
+    color: white !important;
+}
+
+/* Simpler card title */
+.card-title {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}
+
+/* Price card */
+.price-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.price-title {
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+}
+
+.price-content {
+    padding: 0.75rem 1.25rem;
+}
+
+/* No data message */
+.no-data {
+    padding: 2rem;
+    text-align: center;
+    color: #6c757d;
+}

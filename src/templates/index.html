@@ -677,8 +677,7 @@
                     ...domainsData.map(domain => 
                         headers.map(key => domain[key] !== null ? domain[key] : '').join(',')
                     )
-                ].join('
-');
+                ].join('\n');
                 
                 downloadFile(csvContent, 'domain-scores.csv', 'text/csv');
             }
