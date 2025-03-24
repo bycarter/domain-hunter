@@ -84,7 +84,9 @@ def insert_result(conn, result):
 def domain_already_processed(conn, domain):
     """Check if the domain has already been processed completely (has an average score)."""
     c = conn.cursor()
-    c.execute("SELECT average_score FROM domain_results WHERE domain = ?", (domain,))
+    # Normalize the domain before checking
+    normalized_domain = domain.strip().lower()
+    c.execute("SELECT average_score FROM domain_results WHERE LOWER(domain) = ?", (normalized_domain,))
     result = c.fetchone()
     
     # Only consider it processed if it has an average score (successful processing)
@@ -95,7 +97,8 @@ def get_all_processed_domains(conn):
     c = conn.cursor()
     c.execute("SELECT domain FROM domain_results WHERE average_score IS NOT NULL")
     results = c.fetchall()
-    return {row[0] for row in results}
+    # Return normalized domains (lowercase) for consistent comparison
+    return {row[0].lower() for row in results}
 
 def get_top_domains(conn, limit=10):
     """Get the top scoring domains from the database."""
@@ -136,7 +139,7 @@ async def ai_score(domain, client, conn, semaphore, batch_counter, pbar):
     """Score a domain using the OpenAI API with basic retry."""
     global error_counts
     
-    # Skip if already processed with a score
+    # Skip if already processed with a score - use normalized domain for check
     if domain_already_processed(conn, domain):
         return None
     
@@ -316,6 +319,70 @@ IMPORTANT: Return ONLY the JSON object without any markdown formatting, code blo
                 return result
 
 ##############################
+# Debug Functions            #
+##############################
+
+def debug_domain_comparison(available_df, processed_domains):
+    """Print debug information about domain comparison."""
+    print("\n--- Domain Comparison Debug ---")
+    
+    # First, open the CSV directly and get the count
+    try:
+        csv_path = os.path.join(get_data_directory(), 'domain_availability.csv')
+        with open(csv_path, 'r') as f:
+            # Count lines that have "Available" in them (rough count)
+            raw_available_count = sum(1 for line in f if "Available" in line)
+            print(f"Raw count of 'Available' domains in CSV: {raw_available_count}")
+    except Exception as e:
+        print(f"Error checking raw CSV: {e}")
+    
+    # Now check the dataframe
+    print(f"DataFrame rows where status='Available': {len(available_df)}")
+    
+    # Get unique domains from both sources
+    csv_domains = available_df['domain'].str.lower().unique()
+    db_domains = list(processed_domains)  # Already lowercase from get_all_processed_domains
+    
+    print(f"Unique CSV domain count: {len(csv_domains)}")
+    print(f"Unique DB domain count: {len(db_domains)}")
+    
+    # Check intersections
+    csv_domains_set = set(csv_domains)
+    db_domains_set = set(db_domains)
+    
+    print(f"Intersection count: {len(csv_domains_set.intersection(db_domains_set))}")
+    
+    # Show domains that should need processing but might be missed
+    missing_domains = csv_domains_set - db_domains_set
+    print(f"Domains in CSV but not in DB: {len(missing_domains)}")
+    
+    if missing_domains:
+        sample_size = min(5, len(missing_domains))
+        print(f"Sample of domains in CSV not in database:")
+        for domain in list(missing_domains)[:sample_size]:
+            print(f"  - {domain}")
+    
+    # Show any potential duplicates in the CSV
+    if len(csv_domains) != len(available_df):
+        print("\nWARNING: CSV appears to have duplicate domains!")
+        print(f"Total rows: {len(available_df)}, Unique domains: {len(csv_domains)}")
+        
+        # Find and show some duplicates
+        dupes = available_df[available_df.duplicated(subset=['domain'], keep=False)]
+        if not dupes.empty:
+            print(f"Found {len(dupes)} duplicate entries")
+            print("Sample of duplicates:")
+            for domain in dupes['domain'].unique()[:5]:
+                print(f"  - {domain} appears {len(dupes[dupes['domain'] == domain])} times")
+    
+    # Check for other unusual data in the CSV
+    missing_domains = available_df[available_df['domain'].isna() | (available_df['domain'] == '')]
+    if not missing_domains.empty:
+        print(f"\nWARNING: Found {len(missing_domains)} rows with empty domain names!")
+    
+    print("--- End Debug Information ---\n")
+
+##############################
 # Main Function              #
 ##############################
 
@@ -336,12 +403,24 @@ async def main():
     # Get available domains from CSV
     try:
         input_path = os.path.join(get_data_directory(), 'domain_availability.csv')
-        df = pd.read_csv(input_path)
-        available_df = df[df['status'] == 'Available']
+        # Load CSV with explicit dtype to prevent conversion issues
+        df = pd.read_csv(input_path, dtype={'domain': str, 'status': str})
+        
+        # Print CSV structure
+        print(f"\nCSV columns: {df.columns.tolist()}")
+        print(f"CSV status values: {df['status'].unique().tolist()}")
+        
+        # Check for whitespace or case issues in status
+        status_counts = {s.strip(): len(df[df['status'] == s]) for s in df['status'].unique()}
+        print(f"Status counts: {status_counts}")
+        
+        # Filter for available domains (more careful check)
+        available_df = df[df['status'].str.lower().str.strip() == 'available']
         
         total_available = len(available_df)
         if total_available == 0:
             print("No available domains found to score.")
+            show_top_domains(conn)
             return
         
         print(f"Found {total_available} available domains in CSV file")
@@ -349,6 +428,9 @@ async def main():
     except FileNotFoundError:
         print(f"Error: Could not find {input_path}")
         print("Please run check_domains.py first to generate the domain availability data.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
         sys.exit(1)
     
     # Initialize OpenAI client
@@ -362,12 +444,20 @@ async def main():
     processed_domains = get_all_processed_domains(conn)
     print(f"Found {len(processed_domains)} successfully processed domains in database")
     
-    # Filter out domains that are already processed
+    # Debug: Compare domains between CSV and database
+    debug_domain_comparison(available_df, processed_domains)
+    
+    # Filter out domains that are already processed - use normalized domains for comparison
     domains_to_score = []
-    for _, row in available_df.iterrows():
-        domain = row['domain']
-        if domain not in processed_domains:
-            domains_to_score.append(domain)
+    for domain in available_df['domain'].unique():
+        # Skip empty domains
+        if not domain or pd.isna(domain):
+            continue
+            
+        # Normalize domain for comparison
+        normalized_domain = str(domain).strip().lower()
+        if normalized_domain not in processed_domains:
+            domains_to_score.append(domain)  # Add original domain format to the scoring list
     
     total_domains = len(domains_to_score)
     
