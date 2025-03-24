@@ -34,11 +34,26 @@ def get_domains():
     
     # Connect to database
     conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check for columns that exist in the table
+    cursor.execute("PRAGMA table_info(domain_results)")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    # Ensure we're only selecting columns that exist
+    select_columns = ["domain", "memorability", "pronunciation", "visual_appeal", "brandability", "average_score"]
+    
+    # Add price columns if they exist
+    if "price" in columns:
+        select_columns.append("price")
+    if "price_type" in columns:
+        select_columns.append("price_type")
+    if "error" in columns:
+        select_columns.append("error")
     
     # Build the query dynamically
-    query = """
-        SELECT domain, memorability, pronunciation, visual_appeal, brandability, average_score, 
-               price, price_type, error
+    query = f"""
+        SELECT {', '.join(select_columns)}
         FROM domain_results
         WHERE average_score IS NOT NULL
     """
@@ -57,20 +72,47 @@ def get_domains():
         query += " AND domain LIKE ?"
         params.append(f"%{search}%")
     
-    # Add sorting
-    if sort_by in ['domain', 'memorability', 'pronunciation', 'visual_appeal', 'brandability', 'average_score', 'price']:
+    # Add sorting (with validation to prevent SQL injection)
+    if sort_by in columns:
         query += f" ORDER BY {sort_by} {'DESC' if sort_dir.lower() == 'desc' else 'ASC'}"
+    elif sort_by == 'price' and 'price' not in columns:
+        # Fall back to average_score if price column doesn't exist
+        query += f" ORDER BY average_score {'DESC' if sort_dir.lower() == 'desc' else 'ASC'}"
+    else:
+        # Default sort by average_score
+        query += f" ORDER BY average_score {'DESC' if sort_dir.lower() == 'desc' else 'ASC'}"
     
-    # Execute query
-    cursor = conn.execute(query, params)
-    data = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    
-    return jsonify(data)
+    try:
+        # Execute query
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # Convert rows to dictionaries
+        data = []
+        for row in rows:
+            row_dict = {key: row[key] for key in row.keys()}
+            # Ensure price fields exist even if not in database
+            if "price" not in row_dict:
+                row_dict["price"] = None
+            if "price_type" not in row_dict:
+                row_dict["price_type"] = None
+            data.append(row_dict)
+        
+        # Close the connection before returning response
+        conn.close()
+        return jsonify(data)
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e), "message": "Error fetching data from database"}), 500
 
 @app.route('/api/stats')
 def get_stats():
     conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check for columns that exist in the table
+    cursor.execute("PRAGMA table_info(domain_results)")
+    columns = [col[1] for col in cursor.fetchall()]
     
     # Get total domains
     total = conn.execute("SELECT COUNT(*) FROM domain_results").fetchone()[0]
@@ -85,41 +127,51 @@ def get_stats():
     """
     tlds = [dict(row) for row in conn.execute(tlds_query).fetchall()]
     
-    # Get average scores
-    avg_scores = conn.execute("""
+    # Build average scores query based on available columns
+    avg_columns = ["memorability", "pronunciation", "visual_appeal", "brandability", "average_score"]
+    avg_price_included = False
+    
+    if "price" in columns:
+        avg_columns.append("price")
+        avg_price_included = True
+    
+    avg_query = f"""
         SELECT 
-            AVG(memorability) as avg_memorability,
-            AVG(pronunciation) as avg_pronunciation,
-            AVG(visual_appeal) as avg_visual_appeal,
-            AVG(brandability) as avg_brandability,
-            AVG(average_score) as avg_score,
-            AVG(price) as avg_price
+            {', '.join([f'AVG({col}) as avg_{col}' for col in avg_columns])}
         FROM domain_results
         WHERE average_score IS NOT NULL
-    """).fetchone()
+    """
     
-    # Get price statistics
-    price_stats = conn.execute("""
-        SELECT 
-            price_type, 
-            COUNT(*) as count,
-            AVG(price) as avg_price,
-            MIN(price) as min_price,
-            MAX(price) as max_price
-        FROM domain_results
-        WHERE price IS NOT NULL
-        GROUP BY price_type
-    """).fetchall()
+    avg_scores = conn.execute(avg_query).fetchone()
+    avg_dict = {f"avg_{key}": avg_scores[f"avg_{key}"] for key in avg_columns}
     
-    price_data = [dict(row) for row in price_stats]
+    # Get price statistics if the price column exists
+    price_stats = []
+    if "price" in columns and "price_type" in columns:
+        try:
+            price_stats_query = """
+                SELECT 
+                    price_type, 
+                    COUNT(*) as count,
+                    AVG(price) as avg_price,
+                    MIN(price) as min_price,
+                    MAX(price) as max_price
+                FROM domain_results
+                WHERE price IS NOT NULL
+                GROUP BY price_type
+            """
+            price_stats = [dict(row) for row in conn.execute(price_stats_query).fetchall()]
+        except:
+            # Handle case where query fails
+            price_stats = []
     
     conn.close()
     
     return jsonify({
         'total': total,
         'tlds': tlds,
-        'averages': dict(avg_scores),
-        'price_stats': price_data
+        'averages': avg_dict,
+        'price_stats': price_stats
     })
 
 # Create templates directory and template files
@@ -625,6 +677,12 @@ def create_templates():
                 fetch(`/api/domains?${params}`)
                     .then(response => response.json())
                     .then(data => {
+                        if (data.error) {
+                            console.error('API Error:', data.error, data.message);
+                            domainsTable.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error: ${data.message}</td></tr>`;
+                            return;
+                        }
+                        
                         domainsData = data;
                         renderTable(data);
                     })
@@ -639,8 +697,8 @@ def create_templates():
                     .then(response => response.json())
                     .then(data => {
                         document.getElementById('total-domains').textContent = data.total;
-                        document.getElementById('avg-score').textContent = data.averages.avg_score 
-                            ? parseFloat(data.averages.avg_score).toFixed(1)
+                        document.getElementById('avg-score').textContent = data.averages.avg_average_score 
+                            ? parseFloat(data.averages.avg_average_score).toFixed(1)
                             : '-';
                         
                         // Count priced domains
@@ -701,7 +759,7 @@ def create_templates():
                                     }
                                 }
                             });
-                        } else {
+                } else {
                             pricingContainer.innerHTML = '<div class="text-center py-2">No pricing data</div>';
                         }
                     })

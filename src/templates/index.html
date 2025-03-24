@@ -486,6 +486,12 @@
                 fetch(`/api/domains?${params}`)
                     .then(response => response.json())
                     .then(data => {
+                        if (data.error) {
+                            console.error('API Error:', data.error, data.message);
+                            domainsTable.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Error: ${data.message}</td></tr>`;
+                            return;
+                        }
+                        
                         domainsData = data;
                         renderTable(data);
                     })
@@ -500,8 +506,8 @@
                     .then(response => response.json())
                     .then(data => {
                         document.getElementById('total-domains').textContent = data.total;
-                        document.getElementById('avg-score').textContent = data.averages.avg_score 
-                            ? parseFloat(data.averages.avg_score).toFixed(1)
+                        document.getElementById('avg-score').textContent = data.averages.avg_average_score 
+                            ? parseFloat(data.averages.avg_average_score).toFixed(1)
                             : '-';
                         
                         // Count priced domains
@@ -562,7 +568,7 @@
                                     }
                                 }
                             });
-                        } else {
+                } else {
                             pricingContainer.innerHTML = '<div class="text-center py-2">No pricing data</div>';
                         }
                     })
