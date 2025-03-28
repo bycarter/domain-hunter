@@ -8,7 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let filters = {
         search: '',
         tld: '',
-        minScore: 0
+        minScore: 0,
+        priceType: '',
+        maxPrice: 0
     };
     
     // Elements
@@ -17,10 +19,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const tldFilter = document.getElementById('tld-filter');
     const minScoreSlider = document.getElementById('min-score');
     const minScoreValue = document.getElementById('min-score-value');
+    const priceTypeFilter = document.getElementById('price-type-filter');
+    const maxPriceInput = document.getElementById('max-price');
     const applyFiltersBtn = document.getElementById('apply-filters');
     const domainDetails = document.getElementById('domain-details');
     const exportCsvBtn = document.getElementById('export-csv');
     const exportJsonBtn = document.getElementById('export-json');
+    
+    // Check if all required elements exist
+    if (!domainsTable) {
+        console.error("Error: Could not find domains-table element");
+        return;
+    }
     
     // Fetch initial data
     fetchDomains();
@@ -38,11 +48,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     
     // Event listeners
-    applyFiltersBtn.addEventListener('click', fetchDomains);
-    minScoreSlider.addEventListener('input', function() {
-        minScoreValue.textContent = this.value;
-        filters.minScore = parseFloat(this.value);
-    });
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', fetchDomains);
+    }
+    
+    if (minScoreSlider && minScoreValue) {
+        minScoreSlider.addEventListener('input', function() {
+            minScoreValue.textContent = this.value;
+            filters.minScore = parseFloat(this.value);
+        });
+    }
     
     document.querySelectorAll('.sortable').forEach(header => {
         header.addEventListener('click', function() {
@@ -57,28 +72,39 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             const sortIcon = this.querySelector('.sort-icon');
-            sortIcon.classList.add(currentSort.direction);
+            if (sortIcon) {
+                sortIcon.classList.add(currentSort.direction);
+            }
             
             fetchDomains();
         });
     });
     
-    exportCsvBtn?.addEventListener('click', exportCsv);
-    exportJsonBtn?.addEventListener('click', exportJson);
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', exportCsv);
+    }
+    
+    if (exportJsonBtn) {
+        exportJsonBtn.addEventListener('click', exportJson);
+    }
     
     // Functions
     function fetchDomains() {
         console.log("Fetching domains...");
-        filters.search = searchInput.value.trim();
-        filters.tld = tldFilter.value;
-        filters.minScore = parseFloat(minScoreSlider.value);
+        filters.search = searchInput ? searchInput.value.trim() : '';
+        filters.tld = tldFilter ? tldFilter.value : '';
+        filters.minScore = minScoreSlider ? parseFloat(minScoreSlider.value) : 0;
+        filters.priceType = priceTypeFilter ? priceTypeFilter.value : '';
+        filters.maxPrice = maxPriceInput ? (parseFloat(maxPriceInput.value) || 0) : 0;
         
         const params = new URLSearchParams({
             sort_by: currentSort.column,
             sort_dir: currentSort.direction,
             min_score: filters.minScore,
             tld: filters.tld,
-            search: filters.search
+            search: filters.search,
+            price_type: filters.priceType,
+            max_price: filters.maxPrice
         });
         
         fetch(`/api/domains?${params}`)
@@ -112,10 +138,19 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 console.log("Stats API data:", data);
-                document.getElementById('total-domains').textContent = data.total;
-                document.getElementById('avg-score').textContent = data.averages.avg_average_score 
-                    ? parseFloat(data.averages.avg_average_score).toFixed(1)
-                    : '-';
+                const totalDomainsElement = document.getElementById('total-domains');
+                const avgScoreElement = document.getElementById('avg-score');
+                const pricedDomainsElement = document.getElementById('priced-domains');
+                
+                if (totalDomainsElement) {
+                    totalDomainsElement.textContent = data.total;
+                }
+                
+                if (avgScoreElement) {
+                    avgScoreElement.textContent = data.averages.avg_average_score 
+                        ? parseFloat(data.averages.avg_average_score).toFixed(1)
+                        : '-';
+                }
                 
                 // Count priced domains
                 let pricedDomains = 0;
@@ -126,57 +161,66 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     });
                 }
-                document.getElementById('priced-domains').textContent = pricedDomains;
+                
+                if (pricedDomainsElement) {
+                    pricedDomainsElement.textContent = pricedDomains;
+                }
                 
                 // Populate TLD filter
-                tldFilter.innerHTML = '<option value="">All TLDs</option>';
-                data.tlds.forEach(tld => {
-                    const option = document.createElement('option');
-                    option.value = tld.tld;
-                    option.textContent = `.${tld.tld} (${tld.count})`;
-                    tldFilter.appendChild(option);
-                });
+                if (tldFilter) {
+                    tldFilter.innerHTML = '<option value="">All TLDs</option>';
+                    data.tlds.forEach(tld => {
+                        const option = document.createElement('option');
+                        option.value = tld.tld;
+                        option.textContent = `.${tld.tld} (${tld.count})`;
+                        tldFilter.appendChild(option);
+                    });
+                }
                 
                 // Render TLD distribution
                 const tldContainer = document.getElementById('tld-container');
-                tldContainer.innerHTML = '';
-                
-                data.tlds.forEach(tld => {
-                    const tldItem = document.createElement('div');
-                    tldItem.className = 'd-flex justify-content-between mb-1';
-                    tldItem.innerHTML = `
-                        <span>.${tld.tld}</span>
-                        <span class="badge bg-secondary">${tld.count}</span>
-                    `;
-                    tldContainer.appendChild(tldItem);
-                });
+                if (tldContainer) {
+                    tldContainer.innerHTML = '';
+                    
+                    data.tlds.forEach(tld => {
+                        const tldItem = document.createElement('div');
+                        tldItem.className = 'd-flex justify-content-between mb-1';
+                        tldItem.innerHTML = `
+                            <span>.${tld.tld}</span>
+                            <span class="badge bg-secondary">${tld.count}</span>
+                        `;
+                        tldContainer.appendChild(tldItem);
+                    });
+                }
                 
                 // Render pricing stats
                 const pricingContainer = document.getElementById('pricing-container');
-                pricingContainer.innerHTML = '';
-                
-                if (data.price_stats && data.price_stats.length > 0) {
-                    data.price_stats.forEach(stat => {
-                        if (stat.price_type && stat.count) {
-                            const priceItem = document.createElement('div');
-                            priceItem.className = 'd-flex justify-content-between mb-1';
-                            const priceLabel = stat.price_type.charAt(0).toUpperCase() + stat.price_type.slice(1);
-                            priceItem.innerHTML = `
-                                <span>${priceLabel}</span>
-                                <span class="badge bg-${stat.price_type.toLowerCase()}">${stat.count}</span>
-                            `;
-                            pricingContainer.appendChild(priceItem);
-                            
-                            if (stat.avg_price) {
-                                const avgPriceItem = document.createElement('div');
-                                avgPriceItem.className = 'small text-muted mb-2';
-                                avgPriceItem.innerHTML = `Avg: $${parseFloat(stat.avg_price).toFixed(2)}`;
-                                pricingContainer.appendChild(avgPriceItem);
+                if (pricingContainer) {
+                    pricingContainer.innerHTML = '';
+                    
+                    if (data.price_stats && data.price_stats.length > 0) {
+                        data.price_stats.forEach(stat => {
+                            if (stat.price_type && stat.count) {
+                                const priceItem = document.createElement('div');
+                                priceItem.className = 'd-flex justify-content-between mb-1';
+                                const priceLabel = stat.price_type.charAt(0).toUpperCase() + stat.price_type.slice(1);
+                                priceItem.innerHTML = `
+                                    <span>${priceLabel}</span>
+                                    <span class="badge bg-${stat.price_type.toLowerCase()}">${stat.count}</span>
+                                `;
+                                pricingContainer.appendChild(priceItem);
+                                
+                                if (stat.avg_price) {
+                                    const avgPriceItem = document.createElement('div');
+                                    avgPriceItem.className = 'small text-muted mb-2';
+                                    avgPriceItem.innerHTML = `Avg: $${parseFloat(stat.avg_price).toFixed(2)}`;
+                                    pricingContainer.appendChild(avgPriceItem);
+                                }
                             }
-                        }
-                    });
-                } else {
-                    pricingContainer.innerHTML = '<div class="text-center py-2">No pricing data</div>';
+                        });
+                    } else {
+                        pricingContainer.innerHTML = '<div class="text-center py-2">No pricing data</div>';
+                    }
                 }
             })
             .catch(error => {
@@ -242,27 +286,62 @@ document.addEventListener('DOMContentLoaded', function() {
     function showDomainDetails(index) {
         const domain = domainsData[index];
         
-        document.getElementById('detail-domain').textContent = domain.domain;
-        document.getElementById('detail-memorability').textContent = domain.memorability ? parseFloat(domain.memorability).toFixed(1) : '-';
-        document.getElementById('detail-pronunciation').textContent = domain.pronunciation ? parseFloat(domain.pronunciation).toFixed(1) : '-';
-        document.getElementById('detail-visual_appeal').textContent = domain.visual_appeal ? parseFloat(domain.visual_appeal).toFixed(1) : '-';
-        document.getElementById('detail-brandability').textContent = domain.brandability ? parseFloat(domain.brandability).toFixed(1) : '-';
+        const detailDomainElement = document.getElementById('detail-domain');
+        const detailMemorabilityElement = document.getElementById('detail-memorability');
+        const detailPronunciationElement = document.getElementById('detail-pronunciation');
+        const detailVisualAppealElement = document.getElementById('detail-visual_appeal');
+        const detailBrandabilityElement = document.getElementById('detail-brandability');
+        const detailPriceElement = document.getElementById('detail-price');
+        const detailPriceTypeElement = document.getElementById('detail-price-type');
+        const priceDetails = document.getElementById('price-details');
+        
+        if (detailDomainElement) {
+            detailDomainElement.textContent = domain.domain;
+        }
+        
+        if (detailMemorabilityElement) {
+            detailMemorabilityElement.textContent = domain.memorability ? parseFloat(domain.memorability).toFixed(1) : '-';
+        }
+        
+        if (detailPronunciationElement) {
+            detailPronunciationElement.textContent = domain.pronunciation ? parseFloat(domain.pronunciation).toFixed(1) : '-';
+        }
+        
+        if (detailVisualAppealElement) {
+            detailVisualAppealElement.textContent = domain.visual_appeal ? parseFloat(domain.visual_appeal).toFixed(1) : '-';
+        }
+        
+        if (detailBrandabilityElement) {
+            detailBrandabilityElement.textContent = domain.brandability ? parseFloat(domain.brandability).toFixed(1) : '-';
+        }
         
         // Set price details
-        document.getElementById('detail-price').textContent = domain.price ? `$${parseFloat(domain.price).toFixed(2)}` : '-';
-        document.getElementById('detail-price-type').textContent = domain.price_type || '-';
+        if (detailPriceElement) {
+            detailPriceElement.textContent = domain.price ? `$${parseFloat(domain.price).toFixed(2)}` : '-';
+        }
+        
+        if (detailPriceTypeElement) {
+            detailPriceTypeElement.textContent = domain.price_type || '-';
+        }
         
         // Show/hide price details
-        const priceDetails = document.getElementById('price-details');
-        priceDetails.style.display = domain.price_type ? 'block' : 'none';
+        if (priceDetails) {
+            priceDetails.style.display = domain.price_type ? 'block' : 'none';
+        }
         
         // Highlight selected row
         document.querySelectorAll('.domain-item').forEach(row => {
             row.classList.remove('table-active');
         });
-        document.querySelector(`.domain-item[data-index="${index}"]`).classList.add('table-active');
         
-        domainDetails.classList.remove('d-none');
+        const selectedRow = document.querySelector(`.domain-item[data-index="${index}"]`);
+        if (selectedRow) {
+            selectedRow.classList.add('table-active');
+        }
+        
+        if (domainDetails) {
+            domainDetails.classList.remove('d-none');
+        }
     }
     
     function downloadFile(content, filename, type) {

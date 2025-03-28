@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
+  <Errors />
+  <Warnings />
+  <RequestedCommand>namecheap.users.getpricing</RequestedCommand>
+  <CommandResponse Type="namecheap.users.getPricing">
+    <UserGetPricingResult>
+      <ProductType Name="domains">
+        <ProductCategory Name="register">
+          <Product Name="io">
+            <Price Duration="1" DurationType="YEAR" Price="34.98" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="34.98" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="2" DurationType="YEAR" Price="81.56" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="81.56" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="3" DurationType="YEAR" Price="128.14" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="128.14" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="4" DurationType="YEAR" Price="174.72" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="174.72" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="5" DurationType="YEAR" Price="221.30" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="221.30" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="6" DurationType="YEAR" Price="267.88" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="267.88" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="7" DurationType="YEAR" Price="314.46" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="314.46" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="8" DurationType="YEAR" Price="361.04" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="361.04" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="9" DurationType="YEAR" Price="407.62" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="407.62" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="10" DurationType="YEAR" Price="454.20" PricingType="ABSOLUTE" RegularPrice="57.98" RegularPriceType="MULTIPLE" YourPrice="454.20" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+          </Product>
+        </ProductCategory>
+      </ProductType>
+    </UserGetPricingResult>
+  </CommandResponse>
+  <Server>PHX01APIEXT02</Server>
+  <GMTTimeDifference>--4:00</GMTTimeDifference>
+  <ExecutionTime>0.031</ExecutionTime>
+</ApiResponse>

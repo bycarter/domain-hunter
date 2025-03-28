@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="ERROR" xmlns="http://api.namecheap.com/xml.response">
+  <Errors>
+    <Error Number="4">Parameter Command is Invalid</Error>
+    <Error Number="0">Parameter Command implementation not found is Unknown</Error>
+  </Errors>
+  <Warnings />
+  <RequestedCommand>namecheap.domains.marketplace.check</RequestedCommand>
+  <Server>PHX01APIEXT04</Server>
+  <GMTTimeDifference>--4:00</GMTTimeDifference>
+  <ExecutionTime>0.001</ExecutionTime>
+</ApiResponse>

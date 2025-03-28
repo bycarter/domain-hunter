@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import pandas as pd
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 import traceback  # For better error reporting
 
 app = Flask(__name__, 
@@ -19,69 +19,6 @@ def get_data_dir():
     os.makedirs(data_dir, exist_ok=True)
     print(f"Data directory: {data_dir}")
     return data_dir
-
-@app.route('/static/js/simple.js')
-def simple_js():
-    """Serve a simplified JS file to test if there are issues with the original file"""
-    js_content = """
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Simple JS loaded successfully');
-        
-        // Check API endpoints directly
-        fetch('/api/debug')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Debug API response:', data);
-                document.body.innerHTML += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-            
-        fetch('/api/domains')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Domains API response:', data);
-                document.body.innerHTML += '<h3>Found ' + data.length + ' domains</h3>';
-                if (data.length > 0) {
-                    document.body.innerHTML += '<pre>' + JSON.stringify(data[0], null, 2) + '</pre>';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-    });
-    """
-    return js_content, 200, {'Content-Type': 'application/javascript'}
-
-@app.route('/simple')
-def simple_page():
-    """Serve a simplified page to test API connectivity"""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Simple Test</title>
-        <script src="/static/js/simple.js"></script>
-    </head>
-    <body>
-        <h1>Simple Test Page</h1>
-        <p>This page tests basic API connectivity.</p>
-    </body>
-    </html>
-    """
-
-# JS Debug
-@app.route('/debug/js')
-def debug_js():
-    """Return the raw JS file content for debugging"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    js_path = os.path.join(script_dir, 'static', 'js', 'dashboard.js')
-    
-    with open(js_path, 'r') as file:
-        content = file.read()
-    
-    return content, 200, {'Content-Type': 'text/plain'}
 
 # Database connection
 def get_db_connection():
@@ -148,8 +85,10 @@ def get_domains():
     min_score = request.args.get('min_score', 0, type=float)
     tld_filter = request.args.get('tld', '')
     search = request.args.get('search', '')
+    price_type = request.args.get('price_type', '')
+    max_price = request.args.get('max_price', 0, type=float)
     
-    print(f"Query params: sort_by={sort_by}, sort_dir={sort_dir}, min_score={min_score}, tld={tld_filter}, search={search}")
+    print(f"Query params: sort_by={sort_by}, sort_dir={sort_dir}, min_score={min_score}, tld={tld_filter}, search={search}, price_type={price_type}, max_price={max_price}")
     
     try:
         # Connect to database
@@ -192,6 +131,16 @@ def get_domains():
         if search:
             query += " AND domain LIKE ?"
             params.append(f"%{search}%")
+        
+        # Add price type filter
+        if price_type:
+            query += " AND price_type = ?"
+            params.append(price_type)
+        
+        # Add max price filter
+        if max_price > 0:
+            query += " AND price <= ?"
+            params.append(max_price)
         
         # Add sorting (with validation to prevent SQL injection)
         if sort_by in columns:
@@ -311,7 +260,6 @@ def get_stats():
             conn.close()
         return jsonify({"error": str(e), "message": "Error fetching stats"}), 500
 
-# Add debug route to help diagnose issues
 @app.route('/api/debug')
 def api_debug():
     """Debug endpoint to verify API functionality."""

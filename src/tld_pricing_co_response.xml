@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response">
+  <Errors />
+  <Warnings />
+  <RequestedCommand>namecheap.users.getpricing</RequestedCommand>
+  <CommandResponse Type="namecheap.users.getPricing">
+    <UserGetPricingResult>
+      <ProductType Name="domains">
+        <ProductCategory Name="register">
+          <Product Name="co">
+            <Price Duration="1" DurationType="YEAR" Price="12.48" PricingType="ABSOLUTE" RegularPrice="29.98" RegularPriceType="MULTIPLE" YourPrice="12.48" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="2" DurationType="YEAR" Price="42.46" PricingType="ABSOLUTE" RegularPrice="29.98" RegularPriceType="MULTIPLE" YourPrice="42.46" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="3" DurationType="YEAR" Price="72.44" PricingType="ABSOLUTE" RegularPrice="29.98" RegularPriceType="MULTIPLE" YourPrice="72.44" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="4" DurationType="YEAR" Price="102.42" PricingType="ABSOLUTE" RegularPrice="29.98" RegularPriceType="MULTIPLE" YourPrice="102.42" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+            <Price Duration="5" DurationType="YEAR" Price="132.40" PricingType="ABSOLUTE" RegularPrice="29.98" RegularPriceType="MULTIPLE" YourPrice="132.40" YourPriceType="ABSOLUTE" PromotionPrice="0.0" Currency="USD" />
+          </Product>
+        </ProductCategory>
+      </ProductType>
+    </UserGetPricingResult>
+  </CommandResponse>
+  <Server>PHX01APIEXT04</Server>
+  <GMTTimeDifference>--4:00</GMTTimeDifference>
+  <ExecutionTime>0.976</ExecutionTime>
+</ApiResponse>
