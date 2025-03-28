@@ -25,8 +25,11 @@ tld_price_cache = {}
 
 def get_data_directory():
     """Get the absolute path to the data directory."""
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data')
+    # Use absolute path instead of relative path
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_dir = os.path.join(project_root, 'data')
     os.makedirs(data_dir, exist_ok=True)
+    print(f"Using data directory: {data_dir}")  # Add this line for debugging
     return data_dir
 
 def get_db_connection():
@@ -72,7 +75,7 @@ def get_domains_to_process(conn, quantity=None, sort_field="average_score", incl
     
     if not include_taken:
         # Skip domains already marked as Taken
-        query_conditions.append("price_type != 'Taken'")
+        query_conditions.append("(price_type IS NULL OR price_type != 'Taken')")
     
     if skip_priced:
         # Skip domains that have successful pricing info
@@ -798,6 +801,7 @@ async def update_domain_prices(quantity=None, sort_field="average_score", batch_
     pbar.close()
     
     # Get statistics on domains by price type
+    cursor = conn.cursor()  # Add this line to define the cursor
     cursor.execute("""
         SELECT 
             price_type, 

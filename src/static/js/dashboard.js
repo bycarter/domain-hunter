@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
         search: '',
         tld: '',
         minScore: 0,
+        pricedOnly: false,
         priceType: '',
         maxPrice: 0
     };
@@ -25,7 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const domainDetails = document.getElementById('domain-details');
     const exportCsvBtn = document.getElementById('export-csv');
     const exportJsonBtn = document.getElementById('export-json');
-    
+    const pricedOnlyCheckbox = document.getElementById('priced-only');
+
     // Check if all required elements exist
     if (!domainsTable) {
         console.error("Error: Could not find domains-table element");
@@ -87,6 +89,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (exportJsonBtn) {
         exportJsonBtn.addEventListener('click', exportJson);
     }
+    if (pricedOnlyCheckbox) {
+        pricedOnlyCheckbox.addEventListener('change', function() {
+            filters.pricedOnly = this.checked;
+            fetchDomains();
+        });
+    }
     
     // Functions
     function fetchDomains() {
@@ -96,6 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
         filters.minScore = minScoreSlider ? parseFloat(minScoreSlider.value) : 0;
         filters.priceType = priceTypeFilter ? priceTypeFilter.value : '';
         filters.maxPrice = maxPriceInput ? (parseFloat(maxPriceInput.value) || 0) : 0;
+        filters.pricedOnly = pricedOnlyCheckbox ? pricedOnlyCheckbox.checked : false;
         
         const params = new URLSearchParams({
             sort_by: currentSort.column,
@@ -104,7 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
             tld: filters.tld,
             search: filters.search,
             price_type: filters.priceType,
-            max_price: filters.maxPrice
+            max_price: filters.maxPrice,
+            priced_only: filters.pricedOnly ? '1' : '0'
         });
         
         fetch(`/api/domains?${params}`)

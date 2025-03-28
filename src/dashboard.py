@@ -87,8 +87,9 @@ def get_domains():
     search = request.args.get('search', '')
     price_type = request.args.get('price_type', '')
     max_price = request.args.get('max_price', 0, type=float)
+    priced_only = request.args.get('priced_only', '0') == '1'  # Add this parameter
     
-    print(f"Query params: sort_by={sort_by}, sort_dir={sort_dir}, min_score={min_score}, tld={tld_filter}, search={search}, price_type={price_type}, max_price={max_price}")
+    print(f"Query params: sort_by={sort_by}, sort_dir={sort_dir}, min_score={min_score}, tld={tld_filter}, search={search}, price_type={price_type}, max_price={max_price}, priced_only={priced_only}")
     
     try:
         # Connect to database
@@ -141,6 +142,10 @@ def get_domains():
         if max_price > 0:
             query += " AND price <= ?"
             params.append(max_price)
+        
+        # Add priced only filter
+        if priced_only:
+            query += " AND price IS NOT NULL AND price_type != 'Taken'"
         
         # Add sorting (with validation to prevent SQL injection)
         if sort_by in columns:
